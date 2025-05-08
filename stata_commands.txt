@@ -1,0 +1,30 @@
+* Simulate dataset
+set obs 200
+gen id = _n
+drawnorm age income_pre, n(200) means(35 500) sds(10 100)
+gen age = round(age)
+gen income_pre = round(income_pre)
+gen education = round(runiform() * 16)
+
+* Treatment assignment
+gen participation = (income_pre < 550 & education > 5) | runiform() < 0.3
+
+* Post-treatment outcome
+gen income_post = income_pre + 50*participation + rnormal(0, 50)
+
+* Propensity Score Matching
+ssc install psmatch2, replace
+psmatch2 participation age income_pre education, outcome(income_post) neighbor(1) ate
+
+* Difference-in-Differences
+gen time = 0
+replace time = 1 if id > 100
+gen treated = participation
+gen income = .
+replace income = income_pre if time == 0
+replace income = income_post if time == 1
+gen did = treated*time
+reg income treated time did
+
+* Logit model for participation
+logit participation age income_pre education
